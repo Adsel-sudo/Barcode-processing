@@ -34,11 +34,35 @@ class BarcodeBlock:
 
 
 @dataclass(slots=True)
+class BarcodeLabel:
+    page_index: int
+    group_index: int
+    source: str
+    first_line: str
+    second_line: str
+    third_line: str
+    candidate_filename: str
+    text_bbox: BBox
+    label_bbox: BBox
+    line_count: int
+
+
+@dataclass(slots=True)
 class FilenameCandidate:
     value: str
     source_text: str
     is_valid: bool
     reason: str = ""
+
+
+@dataclass(slots=True)
+class LabelExportResult:
+    page_index: int
+    group_index: int
+    candidate_filename: str
+    success: bool
+    output_path: str = ""
+    error_message: str = ""
 
 
 @dataclass(slots=True)
