@@ -393,25 +393,66 @@ def run_paddle_ocr(image_path: Path, lang: str = "ch") -> OCRResult:
         from paddleocr import PaddleOCR
     except Exception as exc:
         raise RuntimeError(f"PaddleOCR 不可用: {exc}") from exc
+    import inspect
 
-    ocr = PaddleOCR(use_angle_cls=True, lang=lang, show_log=False)
-    result = ocr.ocr(str(image_path), cls=True)
+    init_params = set(inspect.signature(PaddleOCR.__init__).parameters.keys())
+    kwargs = {"lang": lang}
+    if "use_textline_orientation" in init_params:
+        kwargs["use_textline_orientation"] = True
+    elif "use_angle_cls" in init_params:
+        kwargs["use_angle_cls"] = True
+    if "show_log" in init_params:
+        kwargs["show_log"] = False
+
+    ocr = PaddleOCR(**kwargs)
+    try:
+        result = ocr.ocr(str(image_path), cls=True)
+    except TypeError:
+        result = ocr.ocr(str(image_path))
 
     tokens: List[OCRToken] = []
     if isinstance(result, list) and result:
-        page = result[0] if isinstance(result[0], list) else result
-        for item in page:
-            if not item or len(item) < 2:
-                continue
-            box = item[0]
-            txt_tuple = item[1]
-            if not isinstance(txt_tuple, (tuple, list)) or not txt_tuple:
-                continue
-            text = str(txt_tuple[0])
-            score = float(txt_tuple[1]) if len(txt_tuple) > 1 else None
-            x1, y1, x2, y2 = _bbox_from_quad(box)
-            if clean_text(text):
-                tokens.append(OCRToken(text=text, x1=x1, y1=y1, x2=x2, y2=y2, score=score))
+        page0 = result[0]
+
+        # 兼容 paddlex 的 OCRResult（dict-like）：包含 rec_polys/rec_texts/rec_scores
+        if hasattr(page0, "get") and page0.get("rec_texts") is not None:
+            rec_texts = page0.get("rec_texts") or []
+            rec_scores = page0.get("rec_scores") or []
+            rec_polys = page0.get("rec_polys") or []
+
+            for poly, text, score in zip(rec_polys, rec_texts, rec_scores):
+                if poly is None:
+                    continue
+                try:
+                    if len(poly) == 0:
+                        continue
+                except Exception:
+                    continue
+                x1, y1, x2, y2 = _bbox_from_quad(poly)
+                t = str(text)
+                if clean_text(t):
+                    s: Optional[float]
+                    try:
+                        s = float(score) if score is not None else None
+                    except Exception:
+                        s = None
+                    tokens.append(OCRToken(text=t, x1=x1, y1=y1, x2=x2, y2=y2, score=s))
+
+        # 兼容旧版 PaddleOCR：[[box, (text, score)], ...]
+        else:
+            page = page0 if isinstance(page0, list) else result
+            for item in page:
+                if not item or len(item) < 2:
+                    continue
+                box = item[0]
+                txt_tuple = item[1]
+                if not isinstance(txt_tuple, (tuple, list)) or not txt_tuple:
+                    continue
+                text = str(txt_tuple[0])
+                score = float(txt_tuple[1]) if len(txt_tuple) > 1 else None
+                x1, y1, x2, y2 = _bbox_from_quad(box)
+                if clean_text(text):
+                    tokens.append(OCRToken(text=text, x1=x1, y1=y1, x2=x2, y2=y2, score=score))
 
     return OCRResult(raw=result, tokens=tokens)
 
