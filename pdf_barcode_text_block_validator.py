@@ -25,8 +25,8 @@
     python pdf_barcode_text_block_validator.py /path/to/file.pdf --json-out result.json
 
 说明：
-- 默认以“文本块(block)内行聚合”为主；
-- 当 block 拆分异常时，可用 --line-cluster-fallback 开启“全页行聚类兜底”。
+- 默认以“全页按坐标列聚类”为主；
+- 保留“文本块(block)内行聚合”作为次要路径。
 """
 
 from __future__ import annotations
@@ -35,6 +35,7 @@ import argparse
 import json
 import re
 import sys
+import string
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
@@ -42,8 +43,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 try:
     import fitz  # PyMuPDF
 except ImportError:
-    print("[ERROR] 未安装 PyMuPDF，请先执行: pip install pymupdf", file=sys.stderr)
-    raise
+    fitz = None  # type: ignore[assignment]
 
 
 BBox = Tuple[float, float, float, float]
@@ -91,12 +91,41 @@ def extract_candidate_filename(line2: str) -> str:
 
     normalized = value.replace("，", ",")
     if "," in normalized:
-        return clean_text(normalized.rsplit(",", 1)[-1])
+        segment = clean_text(normalized.rsplit(",", 1)[-1])
+        return find_last_valid_filename_token(segment)
 
-    if " " in normalized:
-        return clean_text(normalized.rsplit(" ", 1)[-1])
+    return find_last_valid_filename_token(normalized)
 
-    return normalized
+
+def clean_filename_token(token: str) -> str:
+    return (token or "").strip().strip(string.punctuation + "，。；：、？！“”‘’（）【】《》")
+
+
+def is_valid_filename_token(token: str) -> bool:
+    t = clean_filename_token(token)
+    if not t:
+        return False
+
+    lowered = t.lower()
+    if lowered in {"new", "新品", "made in china"}:
+        return False
+    if t.upper().startswith("X0"):
+        return False
+    if not (4 <= len(t) <= 30):
+        return False
+    if "&" in t:
+        return False
+    if not re.search(r"[A-Za-z0-9]", t):
+        return False
+    return True
+
+
+def find_last_valid_filename_token(text: str) -> str:
+    parts = [clean_filename_token(p) for p in clean_text(text).split()]
+    for token in reversed(parts):
+        if is_valid_filename_token(token):
+            return token
+    return ""
 
 
 def parse_page_lines(page: fitz.Page) -> List[PDFLine]:
@@ -162,6 +191,19 @@ def choose_three_lines(lines: Sequence[PDFLine]) -> Optional[Tuple[str, str, str
     return lines[0].text, lines[1].text, lines[2].text
 
 
+def is_barcode_triplet(first: str, second: str, third: str) -> bool:
+    """条码三行结构规则校验。"""
+    first_ok = clean_text(first).upper().startswith("X0")
+    second_ok = bool(clean_text(second))
+    third_norm = clean_text(third).lower()
+    third_ok = (
+        "new" in third_norm
+        or "新品" in third
+        or "made in china" in third_norm
+    )
+    return first_ok and second_ok and third_ok
+
+
 def cluster_lines_by_x(lines: Sequence[PDFLine], x_threshold: float = 80.0) -> List[List[PDFLine]]:
     """兜底：当 block 切分异常时，按 x 左边界聚类（同一列区域倾向属于同条码块）。"""
     if not lines:
@@ -193,6 +235,30 @@ def cluster_lines_by_x(lines: Sequence[PDFLine], x_threshold: float = 80.0) -> L
     return clusters
 
 
+def group_lines_by_three(lines: Sequence[PDFLine]) -> List[Tuple[int, Sequence[PDFLine]]]:
+    """按顺序每 3 行切分一个候选组。"""
+    groups: List[Tuple[int, Sequence[PDFLine]]] = []
+    for i in range(0, len(lines), 3):
+        chunk = lines[i : i + 3]
+        if len(chunk) == 3:
+            groups.append((i // 3 + 1, chunk))
+    return groups
+
+
+def debug_print_column_groups(page_idx: int, clusters: Sequence[Sequence[PDFLine]]) -> None:
+    """输出按列与按组三行的调试信息。"""
+    print(f"[DEBUG] page={page_idx + 1} 列聚类数量: {len(clusters)}")
+    for col_idx, cluster in enumerate(clusters, start=1):
+        print(f"[DEBUG]   列#{col_idx} line_count={len(cluster)}")
+        for ln_idx, ln in enumerate(cluster, start=1):
+            print(f"[DEBUG]     L{ln_idx:02d} y={ln.bbox[1]:.2f} x={ln.bbox[0]:.2f} text={ln.text}")
+        for group_idx, group in group_lines_by_three(cluster):
+            l1, l2, l3 = group
+            print(
+                f"[DEBUG]     组#{group_idx}: [{l1.text}] | [{l2.text}] | [{l3.text}]"
+            )
+
+
 def bbox_union(lines: Sequence[PDFLine]) -> BBox:
     x0 = min(ln.bbox[0] for ln in lines)
     y0 = min(ln.bbox[1] for ln in lines)
@@ -201,54 +267,58 @@ def bbox_union(lines: Sequence[PDFLine]) -> BBox:
     return (x0, y0, x1, y1)
 
 
-def analyze_pdf(pdf_path: Path, use_fallback: bool = False) -> FileResult:
+def analyze_pdf(pdf_path: Path, use_fallback: bool = True, debug: bool = True) -> FileResult:
+    if fitz is None:
+        raise RuntimeError("未安装 PyMuPDF，请先执行: pip install pymupdf")
     doc = fitz.open(pdf_path)
     results: List[BarcodeBlockResult] = []
 
     for page_idx in range(len(doc)):
         page = doc[page_idx]
 
-        # 主流程：直接使用 block
+        # 主流程：全页 line -> 按列聚类 -> 列内每 3 行分组
+        if use_fallback:
+            page_lines = parse_page_lines(page)
+            clusters = cluster_lines_by_x(page_lines)
+            if debug:
+                debug_print_column_groups(page_idx, clusters)
+
+            for cluster in clusters:
+                for _, group in group_lines_by_three(cluster):
+                    first, second, third = group[0].text, group[1].text, group[2].text
+                    if not is_barcode_triplet(first, second, third):
+                        continue
+                    results.append(
+                        BarcodeBlockResult(
+                            page_index=page_idx + 1,
+                            source="fallback-line-cluster",
+                            block_bbox=round_bbox(bbox_union(group)),
+                            first_line=first,
+                            second_line=second,
+                            third_line=third,
+                            candidate_filename=extract_candidate_filename(second),
+                            line_count=3,
+                        )
+                    )
+
+        # 次要路径：保留 block 逻辑（用于交叉验证/兜底）
         for block_bbox, lines in parse_page_blocks(page):
-            chosen = choose_three_lines(lines)
-            if chosen is None:
-                continue
-            first, second, third = chosen
-            results.append(
-                BarcodeBlockResult(
-                    page_index=page_idx + 1,
-                    source="block",
-                    block_bbox=round_bbox(block_bbox),
-                    first_line=first,
-                    second_line=second,
-                    third_line=third,
-                    candidate_filename=extract_candidate_filename(second),
-                    line_count=len(lines),
+            for _, group in group_lines_by_three(lines):
+                first, second, third = group[0].text, group[1].text, group[2].text
+                if not is_barcode_triplet(first, second, third):
+                    continue
+                results.append(
+                    BarcodeBlockResult(
+                        page_index=page_idx + 1,
+                        source="block",
+                        block_bbox=round_bbox(block_bbox),
+                        first_line=first,
+                        second_line=second,
+                        third_line=third,
+                        candidate_filename=extract_candidate_filename(second),
+                        line_count=len(lines),
+                    )
                 )
-            )
-
-        if not use_fallback:
-            continue
-
-        # 兜底流程：全页按 x 聚类后再取前 3 行
-        page_lines = parse_page_lines(page)
-        for cluster in cluster_lines_by_x(page_lines):
-            chosen = choose_three_lines(cluster)
-            if chosen is None:
-                continue
-            first, second, third = chosen
-            results.append(
-                BarcodeBlockResult(
-                    page_index=page_idx + 1,
-                    source="fallback-line-cluster",
-                    block_bbox=round_bbox(bbox_union(cluster)),
-                    first_line=first,
-                    second_line=second,
-                    third_line=third,
-                    candidate_filename=extract_candidate_filename(second),
-                    line_count=len(cluster),
-                )
-            )
 
     return FileResult(
         file_path=str(pdf_path),
@@ -311,10 +381,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("input_path", type=Path, help="PDF 文件路径，或批量模式下的目录")
     parser.add_argument("--batch", action="store_true", help="批量处理目录下所有 PDF")
     parser.add_argument(
-        "--line-cluster-fallback",
-        action="store_true",
-        help="开启全页按 x 坐标聚类兜底（当原始 block 切分异常时有帮助）",
+        "--no-line-cluster-fallback",
+        action="store_false",
+        dest="line_cluster_fallback",
+        default=True,
+        help="关闭全页按 x 坐标列聚类主流程（默认开启）",
     )
+    parser.add_argument("--no-debug", action="store_true", help="关闭按列与分组调试输出")
     parser.add_argument("--json-out", type=Path, default=None, help="输出结构化 JSON 结果")
     return parser
 
@@ -337,7 +410,11 @@ def main() -> int:
 
     for pdf_path in pdf_files:
         try:
-            file_result = analyze_pdf(pdf_path, use_fallback=args.line_cluster_fallback)
+            file_result = analyze_pdf(
+                pdf_path,
+                use_fallback=args.line_cluster_fallback,
+                debug=not args.no_debug,
+            )
         except Exception as exc:
             print(f"[ERROR] 处理失败: {pdf_path} -> {exc}", file=sys.stderr)
             continue
