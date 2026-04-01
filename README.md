@@ -73,3 +73,64 @@ PYTHONPATH=src python -m barcode_tool.cli --help
 ```
 
 详细分层规范见 `docs/repo_structure.md`。
+
+
+## Webhook 服务（飞书接入层骨架）
+
+```bash
+PYTHONPATH=src barcode-tool-server
+# 或
+PYTHONPATH=src uvicorn barcode_tool.api.app:app --host 0.0.0.0 --port 8000
+```
+
+健康检查：`GET /healthz`
+
+飞书回调：`POST /feishu/webhook`
+
+推荐先复制环境变量模板：
+
+```bash
+cp .env.example .env
+```
+
+关键变量：`APP_HOST` `APP_PORT` `APP_ENV` `FEISHU_APP_ID` `FEISHU_APP_SECRET` `OUTPUT_BASE_DIR` `TEMP_DIR`。
+
+
+
+## Docker 最小部署（单服务）
+
+### 本地构建
+
+```bash
+docker build -t barcode-processing:latest .
+```
+
+### 本地启动
+
+```bash
+cp .env.example .env
+docker run --rm -p 8000:8000 \
+  --env-file .env \
+  -v $(pwd)/data/outputs:/data/outputs \
+  -v $(pwd)/data/tmp:/data/tmp \
+  barcode-processing:latest
+```
+
+### 使用 docker compose 启动（推荐）
+
+```bash
+cp .env.example .env
+docker compose up -d --build
+```
+
+### 服务器启动
+
+```bash
+docker compose up -d
+```
+
+### 查看日志
+
+```bash
+docker compose logs -f barcode-service
+```
