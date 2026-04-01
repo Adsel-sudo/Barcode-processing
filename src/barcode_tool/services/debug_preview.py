@@ -1,4 +1,4 @@
-"""Debug preview rendering for label bbox verification."""
+"""Debug preview rendering for export-stage label bbox verification."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pathlib import Path
 import fitz
 from PIL import Image, ImageDraw, ImageFont
 
-from barcode_tool.models.types import BarcodeLabel
+from barcode_tool.models.types import ExportableLabel
 
 
 def render_page_preview(page: fitz.Page, zoom: float = 2.0) -> Image.Image:
@@ -25,15 +25,20 @@ def _load_debug_font() -> ImageFont.ImageFont | ImageFont.FreeTypeFont:
         return ImageFont.load_default()
 
 
+def _build_preview_label_text(label: ExportableLabel) -> str:
+    """Build deterministic preview text based on export-stage label metadata."""
+    return f"[{label.group_index}] {label.candidate_filename}"
+
+
 def draw_label_bboxes(
     image: Image.Image,
-    labels: list[BarcodeLabel],
+    labels: list[ExportableLabel],
     zoom: float = 2.0,
     rect_color: tuple[int, int, int] = (255, 0, 0),
     text_color: tuple[int, int, int] = (0, 0, 255),
     rect_width: int = 2,
 ) -> Image.Image:
-    """Draw label_bbox rectangles and candidate filenames on one page image."""
+    """Draw ExportableLabel.label_bbox rectangles and metadata on one page image."""
     draw = ImageDraw.Draw(image)
     font = _load_debug_font()
 
@@ -44,21 +49,26 @@ def draw_label_bboxes(
 
         text_x = rect[0]
         text_y = max(0, rect[1] - 16)
-        draw.text((text_x, text_y), label.candidate_filename, fill=text_color, font=font)
+        draw.text(
+            (text_x, text_y),
+            _build_preview_label_text(label),
+            fill=text_color,
+            font=font,
+        )
 
     return image
 
 
 def export_debug_previews(
     pdf_path: Path,
-    labels: list[BarcodeLabel],
+    labels: list[ExportableLabel],
     output_dir: Path,
     zoom: float = 2.0,
 ) -> list[Path]:
-    """Export multi-page debug previews with bbox overlays to output directory."""
+    """Export page previews from the same ExportableLabel inputs used by exporter."""
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    labels_by_page: dict[int, list[BarcodeLabel]] = {}
+    labels_by_page: dict[int, list[ExportableLabel]] = {}
     for label in labels:
         labels_by_page.setdefault(label.page_index, []).append(label)
 

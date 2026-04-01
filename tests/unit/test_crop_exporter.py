@@ -6,7 +6,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from barcode_tool.models.types import BarcodeLabel
+from barcode_tool.models.types import ExportableLabel
 from barcode_tool.services.crop_exporter import (
     export_labels_from_pdf,
     fit_image_to_canvas,
@@ -34,29 +34,25 @@ def test_export_labels_from_pdf_generates_fixed_size_jpg_and_deduplicates(tmp_pa
     doc.close()
 
     labels = [
-        BarcodeLabel(
+        ExportableLabel(
             page_index=0,
             group_index=1,
-            source="test",
             first_line="X01",
             second_line="Item Name, ABC123",
             third_line="Made in China",
             candidate_filename="ABC123",
             text_bbox=(20.0, 20.0, 180.0, 80.0),
             label_bbox=(10.0, 10.0, 220.0, 120.0),
-            line_count=3,
         ),
-        BarcodeLabel(
+        ExportableLabel(
             page_index=0,
             group_index=2,
-            source="test",
             first_line="X02",
             second_line="Item Name, ABC123",
             third_line="New",
             candidate_filename="ABC123",
             text_bbox=(20.0, 120.0, 180.0, 180.0),
             label_bbox=(10.0, 110.0, 220.0, 220.0),
-            line_count=3,
         ),
     ]
 
@@ -87,29 +83,25 @@ def test_export_labels_from_pdf_keeps_batch_on_failure(tmp_path: Path) -> None:
     doc.close()
 
     labels = [
-        BarcodeLabel(
+        ExportableLabel(
             page_index=9,
             group_index=1,
-            source="test",
             first_line="X01",
             second_line="foo, BAD",
             third_line="New",
             candidate_filename="BAD",
             text_bbox=(0.0, 0.0, 10.0, 10.0),
             label_bbox=(0.0, 0.0, 10.0, 10.0),
-            line_count=3,
         ),
-        BarcodeLabel(
+        ExportableLabel(
             page_index=0,
             group_index=2,
-            source="test",
             first_line="X02",
             second_line="foo, GOOD",
             third_line="New",
             candidate_filename="GOOD",
             text_bbox=(10.0, 10.0, 80.0, 60.0),
             label_bbox=(5.0, 5.0, 120.0, 90.0),
-            line_count=3,
         ),
     ]
 

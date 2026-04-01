@@ -1,6 +1,7 @@
-from barcode_tool.models.types import TextLine
+from barcode_tool.models.types import DetectedLabel, TextLine
 from barcode_tool.services.label_builder import (
-    build_barcode_labels_from_page,
+    build_detected_labels_from_page,
+    build_exportable_labels,
     compute_label_bbox,
     compute_text_bbox,
     deduplicate_filename,
@@ -38,7 +39,7 @@ def test_filename_sanitize_and_deduplicate() -> None:
     assert deduplicate_filename("foo", seen) == "foo_3"
 
 
-def test_build_barcode_labels_from_page_binds_text_and_label_bbox() -> None:
+def test_build_detected_labels_from_page() -> None:
     groups = [
         [
             _line("X01", (10.0, 100.0, 60.0, 115.0), 0),
@@ -52,15 +53,30 @@ def test_build_barcode_labels_from_page_binds_text_and_label_bbox() -> None:
         ],
     ]
 
-    labels = build_barcode_labels_from_page(
-        page_index=0,
-        groups=groups,
-        page_rect=(0.0, 0.0, 500.0, 700.0),
-    )
+    labels = build_detected_labels_from_page(page_index=0, groups=groups)
 
     assert len(labels) == 2
     assert labels[0].group_index == 1
     assert labels[0].candidate_filename == "AB-123"
     assert labels[1].candidate_filename == "AB-123_2"
     assert labels[0].text_bbox == (10.0, 100.0, 110.0, 149.0)
-    assert labels[0].label_bbox[0] == 0.0
+
+
+def test_build_exportable_labels_from_detected_labels() -> None:
+    detected = [
+        DetectedLabel(
+            page_index=0,
+            group_index=1,
+            source="test",
+            first_line="X01",
+            second_line="Item, ABC",
+            third_line="New",
+            candidate_filename="ABC",
+            text_bbox=(10.0, 100.0, 110.0, 149.0),
+            line_count=3,
+        )
+    ]
+
+    exportable = build_exportable_labels(detected, {0: (0.0, 0.0, 120.0, 200.0)})
+    assert len(exportable) == 1
+    assert exportable[0].label_bbox == (0.0, 0.0, 120.0, 156.35)
