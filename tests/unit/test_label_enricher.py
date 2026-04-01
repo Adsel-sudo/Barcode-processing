@@ -6,16 +6,20 @@ from barcode_tool.services.label_enricher import (
 )
 
 
-def _detected(candidate_filename: str = "ABC") -> DetectedLabel:
+def _detected(
+    candidate_filename: str = "ABC",
+    group_index: int = 1,
+    text_bbox: tuple[float, float, float, float] = (10.0, 100.0, 110.0, 149.0),
+) -> DetectedLabel:
     return DetectedLabel(
         page_index=0,
-        group_index=1,
+        group_index=group_index,
         source="test",
         first_line="X01",
         second_line="Item, ABC",
         third_line="New",
         candidate_filename=candidate_filename,
-        text_bbox=(10.0, 100.0, 110.0, 149.0),
+        text_bbox=text_bbox,
         line_count=3,
     )
 
@@ -48,3 +52,16 @@ def test_enrich_detected_labels_filters_invalid() -> None:
     assert len(exportable) == 1
     assert exportable[0].candidate_filename == "GOOD"
     assert len(warnings) == 1
+
+
+def test_build_exportable_labels_applies_group_safe_top() -> None:
+    labels = build_exportable_labels(
+        [
+            _detected("SECOND", group_index=2, text_bbox=(10.0, 100.0, 110.0, 149.0)),
+            _detected("FIRST", group_index=1, text_bbox=(10.0, 70.0, 110.0, 92.0)),
+        ],
+        {0: (0.0, 0.0, 120.0, 220.0)},
+    )
+
+    assert [item.candidate_filename for item in labels] == ["FIRST", "SECOND"]
+    assert labels[1].label_bbox[1] == 106.7

@@ -14,7 +14,20 @@ def test_compute_text_height_and_expand_bbox() -> None:
     assert compute_text_height(text_bbox) == 49.0
 
     expanded = expand_bbox(text_bbox, BBoxBuildConfig(x_padding=12.0, y_up_scale=2.6, y_down_scale=0.15))
-    assert expanded == (-2.0, -27.400000000000006, 122.0, 156.35)
+    assert expanded == (-2.0, -0.45000000000001705, 122.0, 156.35)
+
+
+def test_expand_bbox_respects_previous_label_safe_top() -> None:
+    text_bbox = (10.0, 100.0, 110.0, 149.0)
+    prev_text_bbox = (10.0, 70.0, 110.0, 92.0)
+
+    expanded = expand_bbox(
+        text_bbox,
+        BBoxBuildConfig(x_padding=12.0, y_up_scale=2.6, y_down_scale=0.15),
+        prev_text_bbox=prev_text_bbox,
+    )
+
+    assert expanded == (-2.0, 106.7, 122.0, 156.35)
 
 
 def test_clamp_bbox_to_page() -> None:
