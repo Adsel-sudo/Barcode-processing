@@ -1,12 +1,12 @@
-"""Analyze PDF text lines into structured BarcodeLabel objects."""
+"""Analyze PDF text lines into recognition-stage DetectedLabel objects."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from barcode_tool.models.types import BarcodeLabel, TextLine
+from barcode_tool.models.types import DetectedLabel, TextLine
 from barcode_tool.services.block_cluster import cluster_lines_by_column
-from barcode_tool.services.label_builder import build_barcode_labels_from_page
+from barcode_tool.services.label_builder import build_detected_labels_from_page
 from barcode_tool.utils.text import clean_text
 
 
@@ -41,10 +41,9 @@ def _debug_print_column_groups(page_index: int, clusters: list[list[TextLine]]) 
 def analyze_page_to_labels(
     page_index: int,
     page_lines: list[TextLine],
-    page_rect: tuple[float, float, float, float],
     x_threshold: float = 80.0,
     debug: bool = False,
-) -> list[BarcodeLabel]:
+) -> list[DetectedLabel]:
     """Analyze one page using validated fallback-line-cluster logic."""
     clusters = cluster_lines_by_column(page_lines, x_threshold=x_threshold)
     if debug:
@@ -56,10 +55,9 @@ def analyze_page_to_labels(
             if _is_barcode_triplet(group):
                 triplet_groups.append(group)
 
-    return build_barcode_labels_from_page(
+    return build_detected_labels_from_page(
         page_index=page_index,
         groups=triplet_groups,
-        page_rect=page_rect,
         source="fallback-line-cluster",
     )
 
@@ -68,15 +66,14 @@ def analyze_pdf_to_labels(
     pdf_path: Path,
     use_fallback_cluster: bool = True,
     debug: bool = False,
-) -> list[BarcodeLabel]:
-    """Analyze all pages in PDF and return structured BarcodeLabel list."""
-    labels: list[BarcodeLabel] = []
+) -> list[DetectedLabel]:
+    """Analyze all pages in PDF and return recognized DetectedLabel list."""
+    labels: list[DetectedLabel] = []
 
     import fitz
 
     with fitz.open(pdf_path) as doc:
         for page_index in range(len(doc)):
-            page = doc[page_index]
             from barcode_tool.services.pdf_parser import parse_page_lines
 
             page_lines = parse_page_lines(pdf_path=pdf_path, page_index=page_index, _doc=doc)
@@ -85,7 +82,6 @@ def analyze_pdf_to_labels(
                 page_labels = analyze_page_to_labels(
                     page_index=page_index,
                     page_lines=page_lines,
-                    page_rect=(page.rect.x0, page.rect.y0, page.rect.x1, page.rect.y1),
                     debug=debug,
                 )
             else:

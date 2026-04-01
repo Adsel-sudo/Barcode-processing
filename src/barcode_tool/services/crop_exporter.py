@@ -8,7 +8,7 @@ from pathlib import Path
 import fitz
 from PIL import Image
 
-from barcode_tool.models.types import BBox, BarcodeLabel, LabelExportResult
+from barcode_tool.models.types import BBox, ExportableLabel, LabelExportResult
 from barcode_tool.utils.filename import sanitize_filename_component
 
 
@@ -62,7 +62,7 @@ def _build_unique_filename(candidate_filename: str, used_names: dict[str, int]) 
 
 def export_label_to_jpg(
     page: fitz.Page,
-    label: BarcodeLabel,
+    label: ExportableLabel,
     output_dir: Path,
     used_names: dict[str, int],
     zoom: float = 2.0,
@@ -70,7 +70,7 @@ def export_label_to_jpg(
     target_height: int = 386,
     jpeg_quality: int = 95,
 ) -> LabelExportResult:
-    """Export one BarcodeLabel as fixed-size JPG without geometric distortion."""
+    """Export one ExportableLabel as fixed-size JPG without geometric distortion."""
     try:
         crop = render_label_crop(page=page, label_bbox=label.label_bbox, zoom=zoom)
         final_image = fit_image_to_canvas(
@@ -89,6 +89,7 @@ def export_label_to_jpg(
             group_index=label.group_index,
             candidate_filename=label.candidate_filename,
             success=True,
+            label_bbox=label.label_bbox,
             output_path=str(output_path),
         )
     except Exception as exc:  # noqa: BLE001 - keep batch export resilient per requirements
@@ -97,13 +98,14 @@ def export_label_to_jpg(
             group_index=label.group_index,
             candidate_filename=label.candidate_filename,
             success=False,
+            label_bbox=label.label_bbox,
             error_message=str(exc),
         )
 
 
 def export_labels_from_pdf(
     pdf_path: Path,
-    labels: list[BarcodeLabel],
+    labels: list[ExportableLabel],
     output_dir: Path,
     zoom: float = 2.0,
     target_width: int = 589,
@@ -123,6 +125,7 @@ def export_labels_from_pdf(
                         group_index=label.group_index,
                         candidate_filename=label.candidate_filename,
                         success=False,
+                        label_bbox=label.label_bbox,
                         error_message=f"invalid page_index: {label.page_index}",
                     )
                 )

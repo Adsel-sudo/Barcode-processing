@@ -7,7 +7,7 @@ import importlib
 import importlib.util
 from pathlib import Path
 
-from barcode_tool.models.types import BarcodeLabel, LabelExportResult
+from barcode_tool.models.types import ExportableLabel, LabelExportResult
 
 
 MANIFEST_FIELDS = [
@@ -25,7 +25,7 @@ MANIFEST_FIELDS = [
 ]
 
 
-def _to_row(label: BarcodeLabel, result: LabelExportResult) -> dict[str, object]:
+def _to_row(label: ExportableLabel, result: LabelExportResult) -> dict[str, object]:
     return {
         "page_index": label.page_index,
         "group_index": label.group_index,
@@ -41,7 +41,7 @@ def _to_row(label: BarcodeLabel, result: LabelExportResult) -> dict[str, object]
     }
 
 
-def write_manifest_csv(report_path: Path, labels: list[BarcodeLabel], results: list[LabelExportResult]) -> Path:
+def write_manifest_csv(report_path: Path, labels: list[ExportableLabel], results: list[LabelExportResult]) -> Path:
     """Write manifest as CSV."""
     report_path.parent.mkdir(parents=True, exist_ok=True)
     with report_path.open("w", encoding="utf-8-sig", newline="") as fh:
@@ -52,7 +52,7 @@ def write_manifest_csv(report_path: Path, labels: list[BarcodeLabel], results: l
     return report_path
 
 
-def write_manifest_excel(report_path: Path, labels: list[BarcodeLabel], results: list[LabelExportResult]) -> Path:
+def write_manifest_excel(report_path: Path, labels: list[ExportableLabel], results: list[LabelExportResult]) -> Path:
     """Write manifest as Excel (.xlsx)."""
     if importlib.util.find_spec("pandas") is None:
         raise RuntimeError("Excel export requires pandas/openpyxl. Please install optional dependencies.")
@@ -66,7 +66,7 @@ def write_manifest_excel(report_path: Path, labels: list[BarcodeLabel], results:
     return report_path
 
 
-def write_manifest(report_path: Path, labels: list[BarcodeLabel], results: list[LabelExportResult]) -> Path:
+def write_manifest(report_path: Path, labels: list[ExportableLabel], results: list[LabelExportResult]) -> Path:
     """Write manifest by file extension: .csv or .xlsx."""
     suffix = report_path.suffix.lower()
     if suffix == ".xlsx":

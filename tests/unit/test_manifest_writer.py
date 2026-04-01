@@ -1,23 +1,21 @@
 from pathlib import Path
 
-from barcode_tool.models.types import BarcodeLabel
+from barcode_tool.models.types import ExportableLabel
 from barcode_tool.models.types import LabelExportResult
 from barcode_tool.services.manifest_writer import write_manifest_csv
 
 
 def test_write_manifest_csv_contains_required_fields(tmp_path: Path) -> None:
     labels = [
-        BarcodeLabel(
+        ExportableLabel(
             page_index=0,
             group_index=1,
-            source="test",
             first_line="X01",
             second_line="Item, ABC",
             third_line="New",
             candidate_filename="ABC",
             text_bbox=(1.0, 2.0, 3.0, 4.0),
             label_bbox=(0.0, 0.0, 10.0, 10.0),
-            line_count=3,
         )
     ]
     results = [

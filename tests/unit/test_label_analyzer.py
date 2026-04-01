@@ -19,7 +19,6 @@ def test_analyze_page_to_labels_uses_fallback_cluster_triplets() -> None:
     labels = analyze_page_to_labels(
         page_index=0,
         page_lines=lines,
-        page_rect=(0.0, 0.0, 400.0, 400.0),
         debug=False,
     )
 

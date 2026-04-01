@@ -34,7 +34,9 @@ class BarcodeBlock:
 
 
 @dataclass(slots=True)
-class BarcodeLabel:
+class DetectedLabel:
+    """Recognition-stage object: parsed from PDF text and geometric grouping."""
+
     page_index: int
     group_index: int
     source: str
@@ -43,8 +45,21 @@ class BarcodeLabel:
     third_line: str
     candidate_filename: str
     text_bbox: BBox
-    label_bbox: BBox
     line_count: int
+
+
+@dataclass(slots=True)
+class ExportableLabel:
+    """Export-stage object: includes computed crop geometry for output."""
+
+    page_index: int
+    group_index: int
+    candidate_filename: str
+    text_bbox: BBox
+    label_bbox: BBox
+    first_line: str = ""
+    second_line: str = ""
+    third_line: str = ""
 
 
 @dataclass(slots=True)
@@ -61,6 +76,7 @@ class LabelExportResult:
     group_index: int
     candidate_filename: str
     success: bool
+    label_bbox: BBox | None = None
     output_path: str = ""
     error_message: str = ""
 

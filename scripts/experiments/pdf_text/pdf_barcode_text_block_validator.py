@@ -19,7 +19,7 @@ from typing import Any, Dict, Iterable, List, Tuple
 
 import fitz
 
-from barcode_tool.models.types import BarcodeLabel
+from barcode_tool.models.types import DetectedLabel
 from barcode_tool.services.label_analyzer import analyze_pdf_to_labels
 
 BBox = Tuple[float, float, float, float]
@@ -49,7 +49,7 @@ def round_bbox(bbox: BBox, digits: int = 2) -> BBox:
     return tuple(round(v, digits) for v in bbox)  # type: ignore[return-value]
 
 
-def _label_to_result(label: BarcodeLabel) -> BarcodeBlockResult:
+def _label_to_result(label: DetectedLabel) -> BarcodeBlockResult:
     return BarcodeBlockResult(
         page_index=label.page_index + 1,
         source=label.source,

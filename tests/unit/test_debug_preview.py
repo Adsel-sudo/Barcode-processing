@@ -6,7 +6,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from barcode_tool.models.types import BarcodeLabel
+from barcode_tool.models.types import ExportableLabel
 from barcode_tool.services.debug_preview import (
     draw_label_bboxes,
     export_debug_previews,
@@ -17,17 +17,15 @@ from barcode_tool.services.debug_preview import (
 def test_draw_label_bboxes_returns_image() -> None:
     image = Image.new("RGB", (300, 200), (255, 255, 255))
     labels = [
-        BarcodeLabel(
+        ExportableLabel(
             page_index=0,
             group_index=1,
-            source="test",
             first_line="X01",
             second_line="Item, A",
             third_line="New",
             candidate_filename="A",
             text_bbox=(0.0, 0.0, 10.0, 10.0),
             label_bbox=(20.0, 30.0, 120.0, 80.0),
-            line_count=3,
         )
     ]
     out = draw_label_bboxes(image=image, labels=labels, zoom=1.0)
@@ -43,29 +41,25 @@ def test_export_debug_previews_multi_page(tmp_path: Path) -> None:
     doc.close()
 
     labels = [
-        BarcodeLabel(
+        ExportableLabel(
             page_index=0,
             group_index=1,
-            source="test",
             first_line="X01",
             second_line="Item, A",
             third_line="New",
             candidate_filename="A",
             text_bbox=(0.0, 0.0, 10.0, 10.0),
             label_bbox=(10.0, 10.0, 60.0, 60.0),
-            line_count=3,
         ),
-        BarcodeLabel(
+        ExportableLabel(
             page_index=1,
             group_index=1,
-            source="test",
             first_line="X02",
             second_line="Item, B",
             third_line="New",
             candidate_filename="B",
             text_bbox=(0.0, 0.0, 10.0, 10.0),
             label_bbox=(20.0, 20.0, 80.0, 80.0),
-            line_count=3,
         ),
     ]
 
