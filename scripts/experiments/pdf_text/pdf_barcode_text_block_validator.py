@@ -19,6 +19,18 @@ from typing import Any, Dict, Iterable, List, Tuple
 
 import fitz
 
+
+def _ensure_project_src_on_path() -> None:
+    """从任意工作目录运行本脚本时，将仓库 `src` 加入 sys.path（无需先 pip install -e .）。"""
+    src = Path(__file__).resolve().parents[3] / "src"
+    if src.is_dir():
+        s = str(src)
+        if s not in sys.path:
+            sys.path.insert(0, s)
+
+
+_ensure_project_src_on_path()
+
 from barcode_tool.models.types import DetectedLabel
 from barcode_tool.services.label_analyzer import analyze_pdf_to_labels
 

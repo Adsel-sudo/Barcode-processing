@@ -4,7 +4,20 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
+
+
+def _ensure_project_src_on_path() -> None:
+    """从任意工作目录运行本脚本时，将仓库 `src` 加入 sys.path（无需先 pip install -e .）。"""
+    src = Path(__file__).resolve().parents[3] / "src"
+    if src.is_dir():
+        s = str(src)
+        if s not in sys.path:
+            sys.path.insert(0, s)
+
+
+_ensure_project_src_on_path()
 
 from barcode_tool.pipeline.label_export_pipeline import run_label_export_pipeline
 
@@ -54,8 +67,17 @@ def main() -> int:
 
     print("=" * 88)
     print(f"PDF: {input_pdf}")
-    print(f"labels: {len(result.labels)} | success: {success_count} | failed: {fail_count}")
+    print(
+        f"detected: {len(result.detected_labels)} | exportable: {len(result.exportable_labels)} | "
+        f"success: {success_count} | failed: {fail_count}"
+    )
     print(f"report: {result.report_path}")
+    if result.enrich_warnings:
+        print(f"enrich warnings: {len(result.enrich_warnings)}")
+        for w in result.enrich_warnings[:20]:
+            print(f"  - {w}")
+        if len(result.enrich_warnings) > 20:
+            print(f"  ... and {len(result.enrich_warnings) - 20} more")
     if result.preview_paths:
         print(f"debug previews: {len(result.preview_paths)} files")
     print("=" * 88)
