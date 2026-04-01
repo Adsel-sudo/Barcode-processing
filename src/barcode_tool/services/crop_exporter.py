@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from io import BytesIO
 from pathlib import Path
 
 import fitz
@@ -12,7 +11,7 @@ from barcode_tool.models.types import BBox, ExportableLabel, LabelExportResult
 from barcode_tool.utils.filename import sanitize_filename_component
 
 
-def render_label_crop(page: fitz.Page, label_bbox: BBox, zoom: float = 2.0) -> Image.Image:
+def render_label_crop(page: fitz.Page, label_bbox: BBox, render_dpi: int = 300) -> Image.Image:
     """Render a cropped image from one PDF page using label_bbox.
 
     The crop uses `page.get_pixmap(clip=...)` and returns an RGB PIL image.
@@ -23,10 +22,8 @@ def render_label_crop(page: fitz.Page, label_bbox: BBox, zoom: float = 2.0) -> I
     if clip.is_empty or clip.width <= 0 or clip.height <= 0:
         raise ValueError("label_bbox is outside page rect or empty after clipping")
 
-    matrix = fitz.Matrix(zoom, zoom)
-    pix = page.get_pixmap(matrix=matrix, clip=clip, alpha=False)
-    image_bytes = pix.tobytes("png")
-    return Image.open(BytesIO(image_bytes)).convert("RGB")
+    pix = page.get_pixmap(dpi=render_dpi, clip=clip, alpha=False)
+    return Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
 
 
 def fit_image_to_canvas(
@@ -65,14 +62,14 @@ def export_label_to_jpg(
     label: ExportableLabel,
     output_dir: Path,
     used_names: dict[str, int],
-    zoom: float = 2.0,
+    render_dpi: int = 300,
     target_width: int = 589,
     target_height: int = 386,
     jpeg_quality: int = 95,
 ) -> LabelExportResult:
     """Export one ExportableLabel as fixed-size JPG without geometric distortion."""
     try:
-        crop = render_label_crop(page=page, label_bbox=label.label_bbox, zoom=zoom)
+        crop = render_label_crop(page=page, label_bbox=label.label_bbox, render_dpi=render_dpi)
         final_image = fit_image_to_canvas(
             image=crop,
             target_width=target_width,
@@ -82,7 +79,12 @@ def export_label_to_jpg(
         output_dir.mkdir(parents=True, exist_ok=True)
         filename = _build_unique_filename(label.candidate_filename, used_names)
         output_path = output_dir / filename
-        final_image.save(output_path, format="JPEG", quality=jpeg_quality, dpi=(300, 300))
+        final_image.save(
+            output_path,
+            format="JPEG",
+            quality=jpeg_quality,
+            subsampling=0,
+        )
 
         return LabelExportResult(
             page_index=label.page_index,
@@ -107,7 +109,7 @@ def export_labels_from_pdf(
     pdf_path: Path,
     labels: list[ExportableLabel],
     output_dir: Path,
-    zoom: float = 2.0,
+    render_dpi: int = 300,
     target_width: int = 589,
     target_height: int = 386,
     jpeg_quality: int = 95,
@@ -137,7 +139,7 @@ def export_labels_from_pdf(
                 label=label,
                 output_dir=output_dir,
                 used_names=used_names,
-                zoom=zoom,
+                render_dpi=render_dpi,
                 target_width=target_width,
                 target_height=target_height,
                 jpeg_quality=jpeg_quality,

@@ -17,6 +17,8 @@ class BBoxBuildConfig:
     x_padding: float = 12.0
     y_up_scale: float = 2.6
     y_down_scale: float = 0.15
+    inter_label_gap_scale: float = 0.3
+    max_height_scale: float = 3.2
 
 
 DEFAULT_BBOX_CONFIG = BBoxBuildConfig()
@@ -30,16 +32,32 @@ def compute_text_height(text_bbox: BBox) -> float:
     return max(text_bbox[3] - text_bbox[1], 0.0)
 
 
-def expand_bbox(text_bbox: BBox, config: BBoxBuildConfig) -> BBox:
+def expand_bbox(
+    text_bbox: BBox,
+    config: BBoxBuildConfig,
+    prev_text_bbox: BBox | None = None,
+) -> BBox:
     """Expand text bbox according to strategy config (before page clamping)."""
     text_x0, text_y0, text_x1, text_y1 = text_bbox
     text_height = compute_text_height(text_bbox)
 
+    raw_y0 = text_y0 - text_height * config.y_up_scale
+    if prev_text_bbox is not None:
+        safe_top = prev_text_bbox[3] + text_height * config.inter_label_gap_scale
+        label_y0 = max(raw_y0, safe_top)
+    else:
+        label_y0 = raw_y0
+
+    label_y1 = text_y1 + text_height * config.y_down_scale
+    max_height = text_height * config.max_height_scale
+    if (label_y1 - label_y0) > max_height:
+        label_y0 = label_y1 - max_height
+
     return (
         text_x0 - config.x_padding,
-        text_y0 - text_height * config.y_up_scale,
+        label_y0,
         text_x1 + config.x_padding,
-        text_y1 + text_height * config.y_down_scale,
+        label_y1,
     )
 
 
@@ -74,13 +92,14 @@ def build_label_bbox(
     page_rect: BBox,
     strategy: str = "default",
     config: BBoxBuildConfig | None = None,
+    prev_text_bbox: BBox | None = None,
 ) -> BBox:
     """Build final export label bbox from text bbox.
 
     Strategy is extensible for future templates. `config` overrides predefined strategy.
     """
     resolved = _resolve_bbox_config(strategy=strategy, config=config)
-    expanded = expand_bbox(text_bbox=text_bbox, config=resolved)
+    expanded = expand_bbox(text_bbox=text_bbox, config=resolved, prev_text_bbox=prev_text_bbox)
     return clamp_bbox_to_page(expanded, page_rect=page_rect)
 
 
@@ -89,6 +108,7 @@ def build_exportable_label(
     page_rect: BBox,
     strategy: str = "default",
     config: BBoxBuildConfig | None = None,
+    prev_text_bbox: BBox | None = None,
 ) -> ExportableLabel:
     """Convert one recognition result into an exportable record."""
     label_bbox = build_label_bbox(
@@ -96,6 +116,7 @@ def build_exportable_label(
         page_rect=page_rect,
         strategy=strategy,
         config=config,
+        prev_text_bbox=prev_text_bbox,
     )
     return ExportableLabel(
         page_index=detected_label.page_index,

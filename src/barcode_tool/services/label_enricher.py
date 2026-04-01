@@ -30,11 +30,23 @@ def build_exportable_labels(
 ) -> list[ExportableLabel]:
     """Build ExportableLabel list from valid detected labels."""
     exportable: list[ExportableLabel] = []
-    for label in detected_labels:
+    prev_text_bbox_by_page: dict[int, BBox] = {}
+    sorted_labels = sorted(detected_labels, key=lambda item: (item.page_index, item.group_index))
+
+    for label in sorted_labels:
         page_rect = page_rect_by_index.get(label.page_index)
         if page_rect is None:
             continue
-        exportable.append(build_exportable_label(label, page_rect=page_rect, strategy=strategy))
+        prev_text_bbox = prev_text_bbox_by_page.get(label.page_index)
+        exportable.append(
+            build_exportable_label(
+                label,
+                page_rect=page_rect,
+                strategy=strategy,
+                prev_text_bbox=prev_text_bbox,
+            )
+        )
+        prev_text_bbox_by_page[label.page_index] = label.text_bbox
     return exportable
 
 
