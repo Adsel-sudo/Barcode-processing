@@ -17,6 +17,5 @@ services:
       OUTPUT_BASE_DIR: "/data/outputs"
       TEMP_DIR: "/data/tmp"
     volumes:
-      - ./data/outputs:/data/outputs
-      - ./data/tmp:/data/tmp
+      - ./data:/data
     restart: unless-stopped
