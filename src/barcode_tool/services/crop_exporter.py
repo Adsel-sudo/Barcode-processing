@@ -32,7 +32,8 @@ def fit_image_to_canvas(
     target_height: int = 386,
     footer_text: str = "Made in China",
     footer_height: int | None = None,
-    main_scale_ratio: float = 0.97,
+    main_scale_ratio: float = 0.93,
+    footer_font_size: int = 54,
 ) -> Image.Image:
     """Fit image to fixed canvas, reserve footer area, and draw centered footer text."""
     if image.width <= 0 or image.height <= 0:
@@ -40,8 +41,8 @@ def fit_image_to_canvas(
     if target_width <= 0 or target_height <= 0:
         raise ValueError("target canvas size must be positive")
 
-    reserved_footer = footer_height if footer_height is not None else max(40, int(round(target_height * 0.14)))
-    reserved_footer = min(max(28, reserved_footer), target_height - 20)
+    reserved_footer = footer_height if footer_height is not None else max(88, int(round(target_height * 0.24)))
+    reserved_footer = min(max(72, reserved_footer), target_height - 20)
     content_height = target_height - reserved_footer
 
     scale = min(target_width / image.width, content_height / image.height) * max(0.1, main_scale_ratio)
@@ -61,6 +62,7 @@ def fit_image_to_canvas(
         footer_text=footer_text,
         target_width=target_width,
         reserved_footer=reserved_footer,
+        footer_font_size=footer_font_size,
     )
 
     text_bbox = draw.textbbox((0, 0), footer_text, font=font)
@@ -77,20 +79,18 @@ def _build_footer_font(
     footer_text: str,
     target_width: int,
     reserved_footer: int,
+    footer_font_size: int,
 ) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
-    """Pick a larger footer font size using "New" as the visual reference baseline."""
+    """Pick a bold, clearly readable footer font size with width-only fallback."""
     horizontal_padding = 20
-    vertical_padding = 6
+    vertical_padding = 8
     max_text_width = max(10, target_width - horizontal_padding * 2)
     max_text_height = max(10, reserved_footer - vertical_padding * 2)
 
     try:
-        # Keep "Made in China" around 70%~90% of an estimated "New" visual size.
-        estimated_new_font_size = max(24, int(round(reserved_footer * 0.95)))
-        desired_font_size = int(round(estimated_new_font_size * 0.82))
-        min_font_size = max(18, int(round(estimated_new_font_size * 0.70)))
-        candidate_size = max(desired_font_size, min_font_size)
-
+        default_size = max(42, footer_font_size)
+        min_font_size = 34
+        candidate_size = default_size
         while candidate_size >= min_font_size:
             font = ImageFont.truetype("DejaVuSans-Bold.ttf", candidate_size)
             text_bbox = draw.textbbox((0, 0), footer_text, font=font)
@@ -99,7 +99,7 @@ def _build_footer_font(
             if text_width <= max_text_width and text_height <= max_text_height:
                 return font
             candidate_size -= 1
-        return ImageFont.truetype("DejaVuSans-Bold.ttf", min_font_size)
+        return ImageFont.truetype("DejaVuSans-Bold.ttf", default_size)
     except OSError:
         return ImageFont.load_default()
 
