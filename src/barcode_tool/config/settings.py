@@ -31,6 +31,7 @@ class Settings:
     # Runtime directories
     output_base_dir: Path = Path("./outputs")
     temp_dir: Path = Path("./tmp")
+    feishu_dedupe_db_path: Path = Path("./tmp/feishu_dedupe.sqlite3")
 
     # Pipeline behavior
     delete_source_on_success: bool = True
@@ -65,6 +66,7 @@ class Settings:
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         self.inbox_dir.mkdir(parents=True, exist_ok=True)
         self.archive_dir.mkdir(parents=True, exist_ok=True)
+        self.feishu_dedupe_db_path.parent.mkdir(parents=True, exist_ok=True)
 
 
 
@@ -80,6 +82,9 @@ def load_settings() -> Settings:
         feishu_api_base=os.getenv("FEISHU_API_BASE", "https://open.feishu.cn/open-apis"),
         output_base_dir=Path(os.getenv("OUTPUT_BASE_DIR", "./outputs")),
         temp_dir=Path(os.getenv("TEMP_DIR", "./tmp")),
+        feishu_dedupe_db_path=Path(
+            os.getenv("FEISHU_DEDUPE_DB_PATH", "./tmp/feishu_dedupe.sqlite3")
+        ),
         delete_source_on_success=_as_bool(os.getenv("DELETE_SOURCE_ON_SUCCESS"), default=True),
         debug_preview_enabled=_as_bool(os.getenv("DEBUG_PREVIEW_ENABLED"), default=False),
         log_level=os.getenv("LOG_LEVEL", "INFO"),

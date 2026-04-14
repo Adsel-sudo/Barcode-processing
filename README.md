@@ -43,8 +43,9 @@ project/
 ## 当前仓库落地情况
 
 - 已完成：`src/barcode_tool` 分层骨架与 CLI 入口。
-- 已完成：脚本分层为 `scripts/experiments`（当前路线实验）和 `scripts/legacy`（历史方案）。
-- 尚未实现：完整裁图导出、清单导出、飞书机器人。
+- 已完成：标签裁图导出、清单导出、调试预览图能力。
+- 已完成：飞书 webhook 接入（去重、异步处理、回传压缩包与摘要消息）。
+- 已完成：开发排查接口（最近 message_id 状态查询）。
 
 ## 后续功能分阶段
 
@@ -55,7 +56,7 @@ project/
 5. 局部裁图与固定尺寸 JPG 导出
 6. 调试预览图输出
 7. 结果清单导出（CSV/JSON）
-8. 飞书机器人（后续阶段）
+8. 飞书机器人（已落地基础能力，持续迭代）
 
 
 ## 最小依赖安装
@@ -75,7 +76,7 @@ PYTHONPATH=src python -m barcode_tool.cli --help
 详细分层规范见 `docs/repo_structure.md`。
 
 
-## Webhook 服务（飞书接入层骨架）
+## Webhook 服务（飞书接入）
 
 ```bash
 PYTHONPATH=src barcode-tool-server
@@ -87,13 +88,41 @@ PYTHONPATH=src uvicorn barcode_tool.api.app:app --host 0.0.0.0 --port 8000
 
 飞书回调：`POST /feishu/webhook`
 
+调试接口（仅 `APP_ENV != prod` 可用）：
+
+- `GET /feishu/debug/messages?limit=50`
+- `GET /feishu/debug/messages/{message_id}`
+
+调试字段：
+
+- `message_id`
+- `task_id`
+- `file_key`
+- `chat_id`
+- `status`（`processing` / `done` / `failed`）
+- `created_at`
+- `updated_at`
+- `result_path`
+- `error_message`
+
 推荐先复制环境变量模板：
 
 ```bash
 cp .env.example .env
 ```
 
-关键变量：`APP_HOST` `APP_PORT` `APP_ENV` `FEISHU_APP_ID` `FEISHU_APP_SECRET` `OUTPUT_BASE_DIR` `TEMP_DIR`。
+关键变量：`APP_HOST` `APP_PORT` `APP_ENV` `FEISHU_APP_ID` `FEISHU_APP_SECRET` `OUTPUT_BASE_DIR` `TEMP_DIR` `FEISHU_DEDUPE_DB_PATH`。
+
+### 飞书 webhook 处理流程（当前实现）
+
+1. 接收事件并解析 `message_id / file_key / chat_id`；
+2. 先做 `message_id` 幂等去重（SQLite）；
+3. 命中重复（`processing/done`）立即返回；
+4. 新事件登记 `processing`，立即返回 `200`；
+5. 后台任务继续执行：下载 PDF → 跑 pipeline → 打包 zip → 上传飞书 → 发送摘要；
+6. 最终更新状态为 `done` 或 `failed`。
+
+这样可降低 webhook 同步耗时，减少飞书重试带来的重复投递。
 
 
 
