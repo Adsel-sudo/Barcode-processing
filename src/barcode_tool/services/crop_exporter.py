@@ -56,13 +56,12 @@ def fit_image_to_canvas(
     canvas.paste(resized, (offset_x, offset_y))
 
     draw = ImageDraw.Draw(canvas)
-    # Slightly enlarge footer text so "Made in China" is closer to the body text size,
-    # while keeping existing center alignment and margins unchanged.
-    font_size = max(16, int(round(reserved_footer * 0.50)))
-    try:
-        font = ImageFont.truetype("DejaVuSans-Bold.ttf", font_size)
-    except OSError:
-        font = ImageFont.load_default()
+    font = _build_footer_font(
+        draw=draw,
+        footer_text=footer_text,
+        target_width=target_width,
+        reserved_footer=reserved_footer,
+    )
 
     text_bbox = draw.textbbox((0, 0), footer_text, font=font)
     text_width = text_bbox[2] - text_bbox[0]
@@ -71,6 +70,38 @@ def fit_image_to_canvas(
     text_y = content_height + max(0, (reserved_footer - text_height) // 2)
     draw.text((text_x, text_y), footer_text, fill=(0, 0, 0), font=font)
     return canvas
+
+
+def _build_footer_font(
+    draw: ImageDraw.ImageDraw,
+    footer_text: str,
+    target_width: int,
+    reserved_footer: int,
+) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+    """Pick a larger footer font size using "New" as the visual reference baseline."""
+    horizontal_padding = 20
+    vertical_padding = 6
+    max_text_width = max(10, target_width - horizontal_padding * 2)
+    max_text_height = max(10, reserved_footer - vertical_padding * 2)
+
+    try:
+        # Keep "Made in China" around 70%~90% of an estimated "New" visual size.
+        estimated_new_font_size = max(24, int(round(reserved_footer * 0.95)))
+        desired_font_size = int(round(estimated_new_font_size * 0.82))
+        min_font_size = max(18, int(round(estimated_new_font_size * 0.70)))
+        candidate_size = max(desired_font_size, min_font_size)
+
+        while candidate_size >= min_font_size:
+            font = ImageFont.truetype("DejaVuSans-Bold.ttf", candidate_size)
+            text_bbox = draw.textbbox((0, 0), footer_text, font=font)
+            text_width = text_bbox[2] - text_bbox[0]
+            text_height = text_bbox[3] - text_bbox[1]
+            if text_width <= max_text_width and text_height <= max_text_height:
+                return font
+            candidate_size -= 1
+        return ImageFont.truetype("DejaVuSans-Bold.ttf", min_font_size)
+    except OSError:
+        return ImageFont.load_default()
 
 
 def _build_unique_filename(candidate_filename: str, used_names: dict[str, int]) -> str:
