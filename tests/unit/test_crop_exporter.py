@@ -1,9 +1,6 @@
-import pytest
-
-fitz = pytest.importorskip("fitz")
-
 from pathlib import Path
 
+import pytest
 from PIL import Image
 
 from barcode_tool.models.types import ExportableLabel
@@ -11,6 +8,8 @@ from barcode_tool.services.crop_exporter import (
     export_labels_from_pdf,
     fit_image_to_canvas,
 )
+
+fitz = pytest.importorskip("fitz")
 
 
 def test_fit_image_to_canvas_keeps_aspect_ratio_and_target_size() -> None:

@@ -1,9 +1,6 @@
-import pytest
-
-fitz = pytest.importorskip("fitz")
-
 from pathlib import Path
 
+import pytest
 from PIL import Image
 
 from barcode_tool.models.types import ExportableLabel
@@ -12,6 +9,8 @@ from barcode_tool.services.debug_preview import (
     export_debug_previews,
     render_page_preview,
 )
+
+fitz = pytest.importorskip("fitz")
 
 
 def test_draw_label_bboxes_returns_image() -> None:
