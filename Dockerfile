@@ -11,6 +11,7 @@ WORKDIR /app
 # Runtime libs for Pillow/PyMuPDF on slim image.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
+       fonts-dejavu-core \
        libjpeg62-turbo \
        zlib1g \
        libglib2.0-0 \
