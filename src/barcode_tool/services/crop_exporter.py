@@ -56,7 +56,9 @@ def fit_image_to_canvas(
     canvas.paste(resized, (offset_x, offset_y))
 
     draw = ImageDraw.Draw(canvas)
-    font_size = max(16, int(round(reserved_footer * 0.42)))
+    # Slightly enlarge footer text so "Made in China" is closer to the body text size,
+    # while keeping existing center alignment and margins unchanged.
+    font_size = max(16, int(round(reserved_footer * 0.50)))
     try:
         font = ImageFont.truetype("DejaVuSans-Bold.ttf", font_size)
     except OSError:
