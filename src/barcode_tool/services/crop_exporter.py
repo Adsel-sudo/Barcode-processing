@@ -33,7 +33,7 @@ def fit_image_to_canvas(
     footer_text: str = "Made in China",
     footer_height: int | None = None,
     main_scale_ratio: float = 0.93,
-    footer_font_size: int = 48,
+    footer_font_size: int = 42,
 ) -> Image.Image:
     """Fit image to fixed canvas, reserve footer area, and draw centered footer text."""
     if image.width <= 0 or image.height <= 0:
@@ -69,7 +69,11 @@ def fit_image_to_canvas(
     text_width = text_bbox[2] - text_bbox[0]
     text_height = text_bbox[3] - text_bbox[1]
     text_x = (target_width - text_width) // 2
-    text_y = content_height + max(0, (reserved_footer - text_height) // 2)
+    centered_text_y = content_height + max(0, (reserved_footer - text_height) // 2)
+    upward_offset = max(10, reserved_footer // 6)
+    min_bottom_margin = 14
+    text_y = max(content_height, centered_text_y - upward_offset)
+    text_y = min(text_y, target_height - text_height - min_bottom_margin)
     draw.text((text_x, text_y), footer_text, fill=(0, 0, 0), font=font)
     return canvas
 
@@ -88,18 +92,18 @@ def _build_footer_font(
     max_text_height = max(10, reserved_footer - vertical_padding * 2)
 
     try:
-        default_size = max(38, footer_font_size)
-        min_font_size = 30
+        default_size = max(34, footer_font_size)
+        min_font_size = 26
         candidate_size = default_size
         while candidate_size >= min_font_size:
-            font = ImageFont.truetype("DejaVuSans.ttf", candidate_size)
+            font = ImageFont.truetype("DejaVuSans-Bold.ttf", candidate_size)
             text_bbox = draw.textbbox((0, 0), footer_text, font=font)
             text_width = text_bbox[2] - text_bbox[0]
             text_height = text_bbox[3] - text_bbox[1]
             if text_width <= max_text_width and text_height <= max_text_height:
                 return font
             candidate_size -= 1
-        return ImageFont.truetype("DejaVuSans.ttf", default_size)
+        return ImageFont.truetype("DejaVuSans-Bold.ttf", default_size)
     except OSError:
         return ImageFont.load_default()
 
