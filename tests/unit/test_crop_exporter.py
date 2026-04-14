@@ -19,6 +19,13 @@ def test_fit_image_to_canvas_keeps_aspect_ratio_and_target_size() -> None:
     assert dst.size == (589, 386)
     # Because source is very wide, top-left corner should remain white padding.
     assert dst.getpixel((0, 0)) == (255, 255, 255)
+    # Footer text should add non-white pixels near bottom-center.
+    footer_non_white = 0
+    for y in range(386 - 60, 386):
+        for x in range(589 // 2 - 120, 589 // 2 + 120):
+            if dst.getpixel((x, y)) != (255, 255, 255):
+                footer_non_white += 1
+    assert footer_non_white > 0
 
 
 def test_export_labels_from_pdf_generates_fixed_size_jpg_and_deduplicates(tmp_path: Path) -> None:
@@ -68,8 +75,10 @@ def test_export_labels_from_pdf_generates_fixed_size_jpg_and_deduplicates(tmp_pa
 
     with Image.open(first) as im1:
         assert im1.size == (589, 386)
+        assert tuple(round(v) for v in im1.info.get("dpi", (0, 0))) == (300, 300)
     with Image.open(second) as im2:
         assert im2.size == (589, 386)
+        assert tuple(round(v) for v in im2.info.get("dpi", (0, 0))) == (300, 300)
 
 
 def test_export_labels_from_pdf_keeps_batch_on_failure(tmp_path: Path) -> None:

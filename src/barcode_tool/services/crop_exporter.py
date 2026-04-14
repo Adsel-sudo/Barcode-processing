@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import fitz
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 from barcode_tool.models.types import BBox, ExportableLabel, LabelExportResult
 from barcode_tool.utils.filename import sanitize_filename_component
@@ -30,12 +30,21 @@ def fit_image_to_canvas(
     image: Image.Image,
     target_width: int = 589,
     target_height: int = 386,
+    footer_text: str = "Made in China",
+    footer_height: int | None = None,
+    main_scale_ratio: float = 0.97,
 ) -> Image.Image:
-    """Fit image to fixed canvas with aspect-ratio resize and white padding."""
+    """Fit image to fixed canvas, reserve footer area, and draw centered footer text."""
     if image.width <= 0 or image.height <= 0:
         raise ValueError("image must have a positive size")
+    if target_width <= 0 or target_height <= 0:
+        raise ValueError("target canvas size must be positive")
 
-    scale = min(target_width / image.width, target_height / image.height)
+    reserved_footer = footer_height if footer_height is not None else max(40, int(round(target_height * 0.14)))
+    reserved_footer = min(max(28, reserved_footer), target_height - 20)
+    content_height = target_height - reserved_footer
+
+    scale = min(target_width / image.width, content_height / image.height) * max(0.1, main_scale_ratio)
     resized_width = max(1, int(round(image.width * scale)))
     resized_height = max(1, int(round(image.height * scale)))
 
@@ -43,8 +52,22 @@ def fit_image_to_canvas(
     canvas = Image.new("RGB", (target_width, target_height), color=(255, 255, 255))
 
     offset_x = (target_width - resized_width) // 2
-    offset_y = (target_height - resized_height) // 2
+    offset_y = max(0, (content_height - resized_height) // 2)
     canvas.paste(resized, (offset_x, offset_y))
+
+    draw = ImageDraw.Draw(canvas)
+    font_size = max(16, int(round(reserved_footer * 0.42)))
+    try:
+        font = ImageFont.truetype("DejaVuSans-Bold.ttf", font_size)
+    except OSError:
+        font = ImageFont.load_default()
+
+    text_bbox = draw.textbbox((0, 0), footer_text, font=font)
+    text_width = text_bbox[2] - text_bbox[0]
+    text_height = text_bbox[3] - text_bbox[1]
+    text_x = (target_width - text_width) // 2
+    text_y = content_height + max(0, (reserved_footer - text_height) // 2)
+    draw.text((text_x, text_y), footer_text, fill=(0, 0, 0), font=font)
     return canvas
 
 
@@ -84,6 +107,7 @@ def export_label_to_jpg(
             format="JPEG",
             quality=jpeg_quality,
             subsampling=0,
+            dpi=(render_dpi, render_dpi),
         )
 
         return LabelExportResult(
