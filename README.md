@@ -75,6 +75,15 @@ PYTHONPATH=src python -m barcode_tool.cli --help
 
 详细分层规范见 `docs/repo_structure.md`。
 
+## 开发自检（建议提交前执行）
+
+```bash
+PYTHONPATH=src pytest -q
+python -m compileall -q src
+```
+
+说明：项目采用 `src/` 布局，本地直接执行测试时请显式设置 `PYTHONPATH=src`。
+
 
 ## Webhook 服务（飞书接入）
 
@@ -110,6 +119,8 @@ PYTHONPATH=src uvicorn barcode_tool.api.app:app --host 0.0.0.0 --port 8000
 ```bash
 cp .env.example .env
 ```
+
+`.env` 已在 `.gitignore` 中，默认不会被提交到仓库。
 
 关键变量：`APP_HOST` `APP_PORT` `APP_ENV` `FEISHU_APP_ID` `FEISHU_APP_SECRET` `OUTPUT_BASE_DIR` `TEMP_DIR` `FEISHU_DEDUPE_DB_PATH`。
 
