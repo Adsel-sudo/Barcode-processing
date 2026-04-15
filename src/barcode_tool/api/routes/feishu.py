@@ -239,7 +239,7 @@ def build_feishu_router(settings: Settings) -> APIRouter:
         file_event = _parse_file_event(payload)
         dedupe_record, created = dedupe_store.get_or_create_message_record(file_event.message_id)
 
-        if not created and dedupe_record.status in {"processing", "done"}:
+        if not created:
             logger.info(
                 "feishu_webhook duplicate event ignored message_id=%s file_key=%s chat_id=%s task_id=%s duplicate=%s final_status=%s",
                 file_event.message_id,
