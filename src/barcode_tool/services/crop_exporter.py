@@ -45,7 +45,10 @@ def fit_image_to_canvas(
     reserved_footer = min(max(76, reserved_footer), target_height - 20)
     content_height = target_height - reserved_footer
 
-    scale = min(target_width / image.width, content_height / image.height) * max(0.1, main_scale_ratio)
+    fit_scale = min(target_width / image.width, content_height / image.height)
+    # Never upscale past the fit bounds; otherwise the pasted image gets clipped and bbox margin
+    # adjustments from upstream become visually ineffective.
+    scale = min(fit_scale * max(0.1, main_scale_ratio), fit_scale)
     resized_width = max(1, int(round(image.width * scale)))
     resized_height = max(1, int(round(image.height * scale)))
 
@@ -53,7 +56,7 @@ def fit_image_to_canvas(
     canvas = Image.new("RGB", (target_width, target_height), color=(255, 255, 255))
 
     offset_x = (target_width - resized_width) // 2
-    upward_shift = max(6, content_height // 40)
+    upward_shift = max(10, content_height // 30)
     offset_y = max(0, (content_height - resized_height) // 2 - upward_shift)
     canvas.paste(resized, (offset_x, offset_y))
 
@@ -71,8 +74,8 @@ def fit_image_to_canvas(
     text_height = text_bbox[3] - text_bbox[1]
     text_x = (target_width - text_width) // 2
     centered_text_y = content_height + max(0, (reserved_footer - text_height) // 2)
-    upward_offset = max(12, reserved_footer // 5)
-    min_bottom_margin = 20
+    upward_offset = max(16, reserved_footer // 4)
+    min_bottom_margin = 24
     text_y = max(content_height, centered_text_y - upward_offset)
     text_y = min(text_y, target_height - text_height - min_bottom_margin)
     draw.text((text_x, text_y), footer_text, fill=(0, 0, 0), font=font)
@@ -94,6 +97,7 @@ def _build_footer_font(
 
     default_size = max(34, footer_font_size)
     min_font_size = 26
+    # Prefer regular first to keep footer slightly heavier than body text without appearing over-bold.
     font_candidates = ("DejaVuSans.ttf", "DejaVuSans-Bold.ttf")
 
     for font_name in font_candidates:
