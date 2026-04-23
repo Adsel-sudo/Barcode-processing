@@ -1,10 +1,11 @@
 from pathlib import Path
 
 import pytest
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 from barcode_tool.models.types import ExportableLabel
 from barcode_tool.services.crop_exporter import (
+    _build_footer_font,
     export_labels_from_pdf,
     fit_image_to_canvas,
 )
@@ -118,3 +119,26 @@ def test_export_labels_from_pdf_keeps_batch_on_failure(tmp_path: Path) -> None:
     assert results[0].success is False
     assert "invalid page_index" in results[0].error_message
     assert results[1].success is True
+
+
+def test_build_footer_font_falls_back_to_bold_when_regular_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    image = Image.new("RGB", (600, 400), color=(255, 255, 255))
+    draw = ImageDraw.Draw(image)
+    original_truetype = ImageFont.truetype
+
+    def _fake_truetype(font: str, size: int, *args, **kwargs):  # noqa: ANN001
+        if font == "DejaVuSans.ttf":
+            raise OSError("missing regular font")
+        return original_truetype(font, size, *args, **kwargs)
+
+    monkeypatch.setattr("barcode_tool.services.crop_exporter.ImageFont.truetype", _fake_truetype)
+
+    font = _build_footer_font(
+        draw=draw,
+        footer_text="Made in China",
+        target_width=589,
+        reserved_footer=80,
+        footer_font_size=42,
+    )
+
+    assert isinstance(font, ImageFont.FreeTypeFont)

@@ -41,13 +41,8 @@ def fit_image_to_canvas(
     if target_width <= 0 or target_height <= 0:
         raise ValueError("target canvas size must be positive")
 
-<<<<<<< HEAD
-    reserved_footer = footer_height if footer_height is not None else max(68, int(round(target_height * 0.18)))
-    reserved_footer = min(max(68, reserved_footer), target_height - 20)
-=======
-    reserved_footer = footer_height if footer_height is not None else max(72, int(round(target_height * 0.20)))
-    reserved_footer = min(max(72, reserved_footer), target_height - 20)
->>>>>>> origin/main
+    reserved_footer = footer_height if footer_height is not None else max(76, int(round(target_height * 0.21)))
+    reserved_footer = min(max(76, reserved_footer), target_height - 20)
     content_height = target_height - reserved_footer
 
     scale = min(target_width / image.width, content_height / image.height) * max(0.1, main_scale_ratio)
@@ -58,7 +53,8 @@ def fit_image_to_canvas(
     canvas = Image.new("RGB", (target_width, target_height), color=(255, 255, 255))
 
     offset_x = (target_width - resized_width) // 2
-    offset_y = max(0, (content_height - resized_height) // 2)
+    upward_shift = max(6, content_height // 40)
+    offset_y = max(0, (content_height - resized_height) // 2 - upward_shift)
     canvas.paste(resized, (offset_x, offset_y))
 
     draw = ImageDraw.Draw(canvas)
@@ -75,8 +71,8 @@ def fit_image_to_canvas(
     text_height = text_bbox[3] - text_bbox[1]
     text_x = (target_width - text_width) // 2
     centered_text_y = content_height + max(0, (reserved_footer - text_height) // 2)
-    upward_offset = max(10, reserved_footer // 6)
-    min_bottom_margin = 14
+    upward_offset = max(12, reserved_footer // 5)
+    min_bottom_margin = 20
     text_y = max(content_height, centered_text_y - upward_offset)
     text_y = min(text_y, target_height - text_height - min_bottom_margin)
     draw.text((text_x, text_y), footer_text, fill=(0, 0, 0), font=font)
@@ -96,21 +92,26 @@ def _build_footer_font(
     max_text_width = max(10, target_width - horizontal_padding * 2)
     max_text_height = max(10, reserved_footer - vertical_padding * 2)
 
-    try:
-        default_size = max(34, footer_font_size)
-        min_font_size = 26
-        candidate_size = default_size
-        while candidate_size >= min_font_size:
-            font = ImageFont.truetype("DejaVuSans-Bold.ttf", candidate_size)
-            text_bbox = draw.textbbox((0, 0), footer_text, font=font)
-            text_width = text_bbox[2] - text_bbox[0]
-            text_height = text_bbox[3] - text_bbox[1]
-            if text_width <= max_text_width and text_height <= max_text_height:
-                return font
-            candidate_size -= 1
-        return ImageFont.truetype("DejaVuSans-Bold.ttf", default_size)
-    except OSError:
-        return ImageFont.load_default()
+    default_size = max(34, footer_font_size)
+    min_font_size = 26
+    font_candidates = ("DejaVuSans.ttf", "DejaVuSans-Bold.ttf")
+
+    for font_name in font_candidates:
+        try:
+            candidate_size = default_size
+            while candidate_size >= min_font_size:
+                font = ImageFont.truetype(font_name, candidate_size)
+                text_bbox = draw.textbbox((0, 0), footer_text, font=font)
+                text_width = text_bbox[2] - text_bbox[0]
+                text_height = text_bbox[3] - text_bbox[1]
+                if text_width <= max_text_width and text_height <= max_text_height:
+                    return font
+                candidate_size -= 1
+            return ImageFont.truetype(font_name, default_size)
+        except OSError:
+            continue
+
+    return ImageFont.load_default()
 
 
 def _build_unique_filename(candidate_filename: str, used_names: dict[str, int]) -> str:
